@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use super::ModLoader;
 use super::content::manifest::fingerprint;
@@ -31,14 +31,10 @@ const DEFAULT_PATHS: &[&str] = &[
 ];
 
 fn collect(root: &Path, relative: &Path, files: &mut BTreeSet<PathBuf>) -> ExportResult<()> {
-    if !crate::storage::safe_relative_path(relative)
-        || relative.components().any(|part| match part {
-            Component::Normal(name) => name
-                .to_str()
-                .is_none_or(|value| value.contains(['\\', ':'])),
-            _ => true,
-        })
-    {
+    if !relative.to_str().is_some_and(|path| {
+        super::import::portable_pack_path(path)
+            .is_ok_and(|normalized| cfg!(windows) || normalized == path)
+    }) {
         return Err(format!("Invalid export path: {}", relative.display()).into());
     }
     let mut ancestor = root.to_path_buf();
@@ -267,3 +263,7 @@ fn write_archive(
     temporary.persist_noclobber(output)?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "tests/export.rs"]
+mod tests;
